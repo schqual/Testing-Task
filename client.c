@@ -53,6 +53,11 @@ int main(int argc, char *argv[]){
         
         printf("Trying to send: %s\n", message);
 
+        /*  Using nanosleep() because:
+            POSIX.1-2001 declares usleep() obsolete and POSIX.1-2008
+                removes the specification of usleep();
+            On Linux, sleep() is implemented via nanosleep().
+        */ 
         nanosleep(&delay, &delay);
     }
 

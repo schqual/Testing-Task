@@ -9,7 +9,7 @@
 
 #define PORT 5584
 
-void *connection_handler(void *);
+void *connection_handler();
 
 int main(){
     int socket_desc, new_socket, c, *new_sock;
@@ -52,14 +52,23 @@ int main(){
         printf("Connection from %s:%i accepted\n", client_ip, client_port);
 
         pthread_t sniffer_thread;
-        new_sock = malloc(1);
+
+        /* Malloc check added and corrected size */
+        if ((new_sock = malloc(sizeof(*new_sock))) == NULL){
+            perror("[!]Malloc");
+            close(socket_desc);
+            close(new_socket);
+            exit(5);           
+        };
         *new_sock = new_socket;
 
         if (pthread_create(&sniffer_thread, NULL, connection_handler, (void*) new_sock) < 0){
             perror("[!]Thread");
+            close(socket_desc);
+            close(new_socket);
             exit(4);
         }
-
+        
         printf("Handler ready\n");
     }
 
@@ -102,6 +111,8 @@ void *connection_handler(void *socket_desc){
 		perror("[!]Recv");
 	}
     
-    //Free the socket pointer
+    //Cleaning up
+    close(sock);
     free(socket_desc);
+    pthread_exit(NULL);
 }
