@@ -8,6 +8,10 @@
 #include <pthread.h>
 
 #define PORT 5584
+#define CONN_NUM 10
+
+int thread_cntr = 0;
+pthread_t thread_id[CONN_NUM];
 
 void *connection_handler();
 
@@ -38,12 +42,13 @@ int main(){
     printf("Binding complete\n");
 
     //Listen
-    listen(socket_desc, 3);
+    listen(socket_desc, CONN_NUM);
 
     //Accept connections
     printf("Waiting for connections...\n");
 
     c = sizeof(struct sockaddr_in);
+
     while(new_socket = accept(socket_desc, (struct sockaddr *)&client, (socklen_t*)&c)){
 
         char *client_ip = inet_ntoa(client.sin_addr);
@@ -51,35 +56,52 @@ int main(){
 
         printf("Connection from %s:%i accepted\n", client_ip, client_port);
 
-        pthread_t sniffer_thread;
-
         /* Malloc check added and corrected size */
         if ((new_sock = malloc(sizeof(*new_sock))) == NULL){
             perror("[!]Malloc");
             close(socket_desc);
             close(new_socket);
+            for ( int i = thread_cntr; i > 0; i--){
+                pthread_exit(&thread_id[i - 1]);
+            }
             exit(5);           
-        };
+        }
         *new_sock = new_socket;
 
-        if (pthread_create(&sniffer_thread, NULL, connection_handler, (void*) new_sock) < 0){
+        if (thread_cntr == CONN_NUM){
+            for ( int i = thread_cntr; i > 0; i--){
+                pthread_join(thread_id[i - 1], NULL);
+            }
+        };
+
+        if (pthread_create(&thread_id[thread_cntr], NULL, connection_handler, (void*) new_sock) < 0){
             perror("[!]Thread");
             close(socket_desc);
             close(new_socket);
+            for ( int i = thread_cntr; i > 0; i--){
+                pthread_exit(&thread_id[i - 1]);
+            }
             exit(4);
         }
         
-        printf("Handler ready\n");
+        printf("Handler ready.\n");
+        thread_cntr++;
     }
 
     if (new_socket < 0){
         perror("[!]Accept failed");
         close(socket_desc);
+        for ( int i = thread_cntr; i > 0; i--){
+            pthread_exit(&thread_id[i - 1]);
+        }
         exit(3);
     }
 
     close(socket_desc);
     close(new_socket);
+    for ( int i = thread_cntr; i > 0; i--){
+        pthread_exit(&thread_id[i - 1]);
+    }
 
     return 0;
 }
@@ -114,5 +136,6 @@ void *connection_handler(void *socket_desc){
     //Cleaning up
     close(sock);
     free(socket_desc);
+    thread_cntr--;
     pthread_exit(NULL);
 }
